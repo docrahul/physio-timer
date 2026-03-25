@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1D9E75">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Physio">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<title>Physio Timer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=DM+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --c-accent: #1D9E75; --c-al: #E1F5EE; --c-ad: #085041;
+  --c-warn: #EF9F27; --c-wl: #FAEEDA; --c-wd: #633806;
+  --c-blue: #378ADD; --c-bl: #E6F1FB; --c-bd: #0C447C;
+  --bg: #ffffff; --bg2: #f5f5f3; --bg3: #efefec;
+  --txt: #1a1a1a; --txt2: #6b6b6b; --bdr: rgba(0,0,0,0.15);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #141414; --bg2: #1f1f1f; --bg3: #2a2a2a; --txt: #f0f0f0; --txt2: #888; --bdr: rgba(255,255,255,0.14); }
+}
+:root[data-theme="dark"] { --bg: #141414; --bg2: #1f1f1f; --bg3: #2a2a2a; --txt: #f0f0f0; --txt2: #888; --bdr: rgba(255,255,255,0.14); }
+:root[data-theme="light"] { --bg: #ffffff; --bg2: #f5f5f3; --bg3: #efefec; --txt: #1a1a1a; --txt2: #6b6b6b; --bdr: rgba(0,0,0,0.15); }
+html, body { width: 100%; background: var(--bg); min-height: 100vh; transition: background 0.2s; }
+#app {
+  font-family: 'DM Sans', sans-serif;
+  color: var(--txt);
+  width: 100%; max-width: 600px;
+  margin: 0 auto;
+  padding: 7vw 5vw 12vw;
+  display: flex; flex-direction: column; gap: 6vw;
+}
+.screen { display: none; flex-direction: column; gap: 5vw; }
+.screen.active { display: flex; }
+h2 { font-size: 7vw; font-weight: 500; }
+.field-label { font-size: 3.8vw; font-weight: 500; color: var(--txt2); margin-bottom: 2vw; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 3.5vw; }
+.stepper { display: flex; align-items: center; border: 1.5px solid var(--bdr); border-radius: 3vw; overflow: hidden; height: 15vw; }
+.stepper button { width: 15vw; height: 15vw; min-width: 48px; min-height: 48px; border: none; background: var(--bg2); color: var(--txt); font-size: 7vw; cursor: pointer; flex-shrink: 0; font-family: 'DM Sans', sans-serif; line-height: 1; }
+.stepper button:active { background: var(--bg3); }
+.stepper span { flex: 1; text-align: center; font-size: 5.5vw; font-weight: 500; font-family: 'DM Mono', monospace; color: var(--txt); }
+input[type="text"] { height: 15vw; min-height: 48px; padding: 0 4vw; border-radius: 3vw; border: 1.5px solid var(--bdr); background: var(--bg); color: var(--txt); font-size: 4.5vw; width: 100%; font-family: 'DM Sans', sans-serif; }
+.big-btn { width: 100%; height: 17vw; min-height: 56px; border-radius: 3vw; border: none; font-size: 5.5vw; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+.big-btn:active { opacity: 0.75; }
+.btn-start { background: var(--c-accent); color: #fff; }
+.btn-go { background: var(--c-accent); color: #fff; font-size: 6.5vw; height: 22vw; min-height: 70px; }
+.btn-ghost { background: var(--bg2); color: var(--txt); border: 1.5px solid var(--bdr); }
+.timer-header { display: flex; justify-content: space-between; align-items: baseline; }
+.ex-title { font-size: 5vw; font-weight: 500; }
+.set-lbl { font-size: 4vw; color: var(--txt2); font-family: 'DM Mono', monospace; }
+.phase-wrap { display: flex; justify-content: center; }
+.phase-badge { font-size: 3.8vw; font-weight: 500; padding: 1.8vw 5vw; border-radius: 99px; font-family: 'DM Sans', sans-serif; }
+.ph-countdown { background: var(--c-bl); color: var(--c-bd); }
+.ph-ready { background: var(--bg2); color: var(--txt2); border: 1px solid var(--bdr); }
+.ph-hold { background: var(--c-al); color: var(--c-ad); }
+.ph-rest { background: var(--c-wl); color: var(--c-wd); }
+.ring-wrap { display: flex; justify-content: center; }
+.ring-container { position: relative; width: 65vw; height: 65vw; max-width: 300px; max-height: 300px; }
+.ring-container svg { width: 100%; height: 100%; overflow: visible; }
+#ring-bg { fill: none; stroke: var(--bg2); stroke-width: 8; }
+#ring-fill { fill: none; stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset 0.5s linear, stroke 0.3s; transform-origin: 50% 50%; transform: rotate(-90deg); }
+.ring-center { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.timer-time { font-size: 18vw; font-weight: 500; font-family: 'DM Mono', monospace; color: var(--txt); letter-spacing: -1vw; line-height: 1; }
+.timer-sub { font-size: 3.8vw; color: var(--txt2); margin-top: 1.5vw; }
+.rep-bar { display: flex; justify-content: space-between; align-items: center; padding: 4vw 5vw; border-radius: 3vw; background: var(--bg2); border: 1.5px solid var(--bdr); }
+.rep-count { font-size: 9vw; font-weight: 500; font-family: 'DM Mono', monospace; color: var(--txt); }
+.rep-count .rep-of { font-size: 5.5vw; color: var(--txt2); }
+.rep-word { font-size: 3.2vw; color: var(--txt2); margin-top: 1vw; }
+.rep-dots { display: grid; gap: 2vw; justify-items: center; }
+.dot { width: 4vw; height: 4vw; min-width: 12px; min-height: 12px; border-radius: 50%; background: var(--bdr); transition: background 0.3s; }
+.dot.done { background: var(--c-accent); }
+.dot.active { background: var(--c-warn); }
+.ctrl-row { display: flex; gap: 3vw; }
+.ctrl-row .big-btn { flex: 1; height: 15vw; min-height: 50px; font-size: 4.5vw; }
+.hint { font-size: 3.8vw; color: var(--txt2); text-align: center; }
+.summary-card { background: var(--bg2); border-radius: 3vw; padding: 8vw 5vw; border: 1.5px solid var(--bdr); text-align: center; }
+.summary-big { font-size: 13vw; font-family: 'DM Mono', monospace; color: var(--c-accent); font-weight: 500; margin-bottom: 2vw; }
+.summary-name { font-size: 4.5vw; color: var(--txt2); margin-bottom: 6vw; }
+.summary-row { display: flex; justify-content: space-around; }
+.summary-stat { display: flex; flex-direction: column; align-items: center; gap: 1.5vw; }
+.summary-num { font-size: 8vw; font-weight: 500; font-family: 'DM Mono', monospace; color: var(--txt); }
+.summary-lbl { font-size: 3.2vw; color: var(--txt2); }
+#theme-btn {
+  position: fixed; top: 4vw; right: 4vw;
+  width: 11vw; height: 11vw; min-width: 38px; min-height: 38px;
+  border-radius: 50%; border: 1.5px solid var(--bdr);
+  background: var(--bg2); color: var(--txt);
+  font-size: 5vw; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100; transition: background 0.2s;
+}
+#theme-btn:active { background: var(--bg3); }
+
+/* Update banner */
+#update-banner {
+  display: none;
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--c-accent); color: #fff;
+  padding: 4vw 5vw;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 4vw; font-weight: 500;
+  flex-direction: row; align-items: center; justify-content: space-between;
+  z-index: 200; gap: 3vw;
+}
+#update-banner.visible { display: flex; }
+#update-banner span { flex: 1; }
+#update-banner button {
+  background: #fff; color: var(--c-accent);
+  border: none; border-radius: 2vw;
+  padding: 2vw 4vw; font-size: 3.8vw; font-weight: 500;
+  cursor: pointer; font-family: 'DM Sans', sans-serif;
+  white-space: nowrap;
+}
+</style>
+</head>
+<body>
+
+<button id="theme-btn" onclick="toggleTheme()" title="Toggle dark mode">&#9788;</button>
+
+<div id="update-banner">
+  <span>Update available</span>
+  <button onclick="applyUpdate()">Refresh</button>
+</div>
+
+<div id="app">
+
+  <div class="screen active" id="screen-setup">
+    <h2>Exercise setup</h2>
+    <div>
+      <div class="field-label">Exercise name</div>
+      <input type="text" id="exName" placeholder="e.g. Quad stretch">
+    </div>
+    <div class="row2">
+      <div>
+        <div class="field-label">Hold time (sec)</div>
+        <div class="stepper"><button onclick="adj('holdTime',-5)">-</button><span id="holdTime-val">30</span><button onclick="adj('holdTime',5)">+</button></div>
+      </div>
+      <div>
+        <div class="field-label">Reps</div>
+        <div class="stepper"><button onclick="adj('reps',-1)">-</button><span id="reps-val">5</span><button onclick="adj('reps',1)">+</button></div>
+      </div>
+    </div>
+    <div class="row2">
+      <div>
+        <div class="field-label">Rest (sec)</div>
+        <div class="stepper"><button onclick="adj('restTime',-5)">-</button><span id="restTime-val">10</span><button onclick="adj('restTime',5)">+</button></div>
+      </div>
+      <div>
+        <div class="field-label">Sets</div>
+        <div class="stepper"><button onclick="adj('sets',-1)">-</button><span id="sets-val">1</span><button onclick="adj('sets',1)">+</button></div>
+      </div>
+    </div>
+    <div>
+      <div class="field-label">Countdown before start (sec)</div>
+      <div class="stepper"><button onclick="adj('countdown',-1)">-</button><span id="countdown-val">5</span><button onclick="adj('countdown',1)">+</button></div>
+    </div>
+    <button class="big-btn btn-start" onclick="startSession()">Start</button>
+  </div>
+
+  <div class="screen" id="screen-timer">
+    <div class="timer-header">
+      <span class="ex-title" id="ex-title">Exercise</span>
+      <span class="set-lbl" id="set-label">Set 1 / 1</span>
+    </div>
+    <div class="phase-wrap">
+      <span class="phase-badge ph-countdown" id="phase-badge">Get ready</span>
+    </div>
+    <div class="ring-wrap">
+      <div class="ring-container">
+        <svg viewBox="0 0 240 240">
+          <circle id="ring-bg" cx="120" cy="120" r="100"/>
+          <circle id="ring-fill" cx="120" cy="120" r="100"/>
+        </svg>
+        <div class="ring-center">
+          <div class="timer-time" id="timer-display">5</div>
+          <div class="timer-sub" id="timer-sub">get ready</div>
+        </div>
+      </div>
+    </div>
+    <div class="rep-bar">
+      <div>
+        <div class="rep-count"><span id="rep-current">1</span> <span class="rep-of">/ <span id="rep-total">5</span></span></div>
+        <div class="rep-word">rep</div>
+      </div>
+      <div class="rep-dots" id="rep-dots"></div>
+    </div>
+    <button class="big-btn btn-go" id="btn-go" onclick="manualGo()" style="display:none;">Hold</button>
+    <div class="hint" id="hint-text" style="display:none;">Press when you are in position</div>
+    <div class="ctrl-row">
+      <button class="big-btn btn-ghost" id="btn-pause" onclick="togglePause()">Pause</button>
+      <button class="big-btn btn-ghost" onclick="stopSession()">Stop</button>
+    </div>
+  </div>
+
+  <div class="screen" id="screen-summary">
+    <div class="summary-card">
+      <div class="summary-big">Done</div>
+      <div class="summary-name" id="sum-name">Exercise complete</div>
+      <div class="summary-row">
+        <div class="summary-stat"><span class="summary-num" id="sum-reps">0</span><span class="summary-lbl">reps</span></div>
+        <div class="summary-stat"><span class="summary-num" id="sum-sets">0</span><span class="summary-lbl">sets</span></div>
+        <div class="summary-stat"><span class="summary-num" id="sum-time">0s</span><span class="summary-lbl">hold</span></div>
+      </div>
+    </div>
+    <button class="big-btn btn-start" onclick="again()">Again</button>
+    <button class="big-btn btn-ghost" onclick="goSetup()">Edit setup</button>
+  </div>
+
+</div>
+
+<script>
+// ── PWA service worker registration ──────────────────────────────────────────
+let pendingSW = null;
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').then(function(reg) {
+    reg.addEventListener('updatefound', function() {
+      var newSW = reg.installing;
+      newSW.addEventListener('statechange', function() {
+        if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+          pendingSW = newSW;
+          document.getElementById('update-banner').classList.add('visible');
+        }
+      });
+    });
+  });
+  navigator.serviceWorker.addEventListener('controllerchange', function() {
+    window.location.reload();
+  });
+}
+function applyUpdate() {
+  if (pendingSW) { pendingSW.postMessage({ type: 'SKIP_WAITING' }); }
+  else { window.location.reload(); }
+}
+
+// ── App logic ─────────────────────────────────────────────────────────────────
+const vals = { holdTime:30, reps:5, restTime:10, sets:1, countdown:5 };
+const mins = { holdTime:5, reps:1, restTime:0, sets:1, countdown:0 };
+const maxs = { holdTime:300, reps:20, restTime:120, sets:5, countdown:30 };
+
+function adj(k, d) {
+  vals[k] = Math.min(maxs[k], Math.max(mins[k], vals[k] + d));
+  document.getElementById(k + '-val').textContent = vals[k];
+}
+function show(id) {
+  document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
+  document.getElementById(id).classList.add('active');
+}
+
+let audioCtx = null;
+function beep(freq, dur, vol) {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.connect(g); g.connect(audioCtx.destination);
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(vol || 0.4, audioCtx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+    o.start(); o.stop(audioCtx.currentTime + dur);
+  } catch(e) {}
+}
+function beepCountdown() { beep(660, 0.1, 0.3); }
+function beepGo()   { beep(880,0.1); setTimeout(function(){beep(880,0.1);},130); setTimeout(function(){beep(1100,0.2);},260); }
+function beepDone() { beep(660,0.15); setTimeout(function(){beep(440,0.3);},200); }
+function beepTick() { beep(1200, 0.06, 0.2); }
+function beepRest() { beep(550, 0.2, 0.3); }
+function beepReady(){ beep(770, 0.15, 0.35); }
+
+var CIRC = 2 * Math.PI * 100;
+var ringFill = document.getElementById('ring-fill');
+ringFill.style.strokeDasharray = CIRC;
+
+function setRing(frac, color) {
+  ringFill.style.strokeDashoffset = CIRC * (1 - Math.max(0, Math.min(1, frac)));
+  ringFill.style.stroke = color || '#1D9E75';
+}
+function fmtTime(s) {
+  s = Math.max(0, s);
+  if (s >= 60) return Math.floor(s/60) + ':' + String(s % 60).padStart(2,'0');
+  return String(s);
+}
+function badge(text, cls) {
+  var b = document.getElementById('phase-badge');
+  b.textContent = text; b.className = 'phase-badge ' + cls;
+}
+function buildDots() {
+  var c = document.getElementById('rep-dots'); c.innerHTML = '';
+  var n = Math.min(vals.reps, 20);
+  var cols = n <= 5 ? n : n <= 10 ? Math.ceil(n/2) : n <= 15 ? Math.ceil(n/3) : Math.ceil(n/4);
+  c.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+  for (var i = 0; i < n; i++) {
+    var d = document.createElement('div');
+    d.className = 'dot'; d.id = 'dot-' + i; c.appendChild(d);
+  }
+}
+function updateDots(done) {
+  var n = Math.min(vals.reps, 20);
+  for (var i = 0; i < n; i++) {
+    var d = document.getElementById('dot-' + i); if (!d) continue;
+    d.className = 'dot' + (i < done ? ' done' : (i === done ? ' active' : ''));
+  }
+}
+function setGoBtn(visible) {
+  document.getElementById('btn-go').style.display = visible ? 'block' : 'none';
+  document.getElementById('hint-text').style.display = visible ? 'block' : 'none';
+}
+
+var st = {};
+function resetState() {
+  clearInterval(st.interval);
+  st = { phase:'idle', rep:0, set:0, timeLeft:0, totalHold:0, paused:false, interval:null, waitingForGo:false };
+}
+
+function startSession() {
+  resetState();
+  document.getElementById('ex-title').textContent = document.getElementById('exName').value || 'Exercise';
+  document.getElementById('rep-current').textContent = 1;
+  document.getElementById('rep-total').textContent = vals.reps;
+  document.getElementById('set-label').textContent = 'Set 1 / ' + vals.sets;
+  document.getElementById('btn-pause').textContent = 'Pause';
+  buildDots(); updateDots(0); setGoBtn(false);
+  show('screen-timer');
+  vals.countdown > 0 ? startCountdown() : showReadyPrompt();
+}
+
+function startCountdown() {
+  st.phase = 'countdown'; st.timeLeft = vals.countdown;
+  badge('Get ready', 'ph-countdown');
+  setRing(1, '#378ADD');
+  document.getElementById('timer-display').textContent = fmtTime(st.timeLeft);
+  document.getElementById('timer-sub').textContent = 'get ready';
+  clearInterval(st.interval);
+  st.interval = setInterval(function() {
+    if (st.paused) return;
+    st.timeLeft--;
+    setRing(st.timeLeft / vals.countdown, '#378ADD');
+    document.getElementById('timer-display').textContent = fmtTime(st.timeLeft);
+    if (st.timeLeft <= 3 && st.timeLeft > 0) beepCountdown();
+    if (st.timeLeft <= 0) { clearInterval(st.interval); showReadyPrompt(); }
+  }, 1000);
+}
+
+function showReadyPrompt() {
+  clearInterval(st.interval);
+  st.phase = 'ready'; st.waitingForGo = true;
+  badge('Ready', 'ph-ready');
+  setRing(0, '#1D9E75');
+  document.getElementById('timer-display').textContent = '-';
+  document.getElementById('timer-sub').textContent = 'rep ' + (st.rep + 1);
+  document.getElementById('rep-current').textContent = st.rep + 1;
+  updateDots(st.rep);
+  setGoBtn(true);
+  beepReady();
+}
+
+function manualGo() {
+  if (!st.waitingForGo) return;
+  st.waitingForGo = false; setGoBtn(false);
+  startHold();
+}
+
+function startHold() {
+  st.phase = 'hold'; st.timeLeft = vals.holdTime;
+  badge('Hold', 'ph-hold');
+  setRing(1, '#1D9E75');
+  document.getElementById('timer-display').textContent = fmtTime(st.timeLeft);
+  document.getElementById('timer-sub').textContent = 'remaining';
+  beepGo();
+  clearInterval(st.interval);
+  st.interval = setInterval(function() {
+    if (st.paused) return;
+    st.timeLeft--;
+    setRing(st.timeLeft / vals.holdTime, '#1D9E75');
+    document.getElementById('timer-display').textContent = fmtTime(st.timeLeft);
+    if (st.timeLeft <= 3 && st.timeLeft > 0) beepTick();
+    if (st.timeLeft <= 0) { clearInterval(st.interval); repDone(); }
+  }, 1000);
+}
+
+function repDone() {
+  st.totalHold += vals.holdTime; st.rep++;
+  updateDots(st.rep); beepDone();
+  if (st.rep >= vals.reps) { endSet(); return; }
+  vals.restTime > 0 ? startRest() : showReadyPrompt();
+}
+
+function startRest() {
+  st.phase = 'rest'; st.timeLeft = vals.restTime;
+  badge('Rest', 'ph-rest');
+  setRing(1, '#EF9F27');
+  document.getElementById('timer-display').textContent = fmtTime(st.timeLeft);
+  document.getElementById('timer-sub').textContent = 'rest';
+  beepRest();
+  clearInterval(st.interval);
+  st.interval = setInterval(function() {
+    if (st.paused) return;
+    st.timeLeft--;
+    setRing(st.timeLeft / vals.restTime, '#EF9F27');
+    document.getElementById('timer-display').textContent = fmtTime(st.timeLeft);
+    if (st.timeLeft <= 0) { clearInterval(st.interval); showReadyPrompt(); }
+  }, 1000);
+}
+
+function endSet() {
+  clearInterval(st.interval); st.set++;
+  if (st.set >= vals.sets) { showSummary(); return; }
+  document.getElementById('set-label').textContent = 'Set ' + (st.set + 1) + ' / ' + vals.sets;
+  st.rep = 0; buildDots(); updateDots(0);
+  if (vals.restTime > 0) {
+    st.phase = 'rest'; st.timeLeft = vals.restTime;
+    badge('Set rest', 'ph-rest');
+    setRing(1, '#EF9F27');
+    document.getElementById('timer-display').textContent = fmtTime(st.timeLeft);
+    document.getElementById('timer-sub').textContent = 'set rest';
+    beepRest();
+    st.interval = setInterval(function() {
+      if (st.paused) return;
+      st.timeLeft--;
+      setRing(st.timeLeft / vals.restTime, '#EF9F27');
+      document.getElementById('timer-display').textContent = fmtTime(st.timeLeft);
+      if (st.timeLeft <= 0) { clearInterval(st.interval); showReadyPrompt(); }
+    }, 1000);
+  } else { showReadyPrompt(); }
+}
+
+function togglePause() {
+  if (st.waitingForGo) return;
+  st.paused = !st.paused;
+  document.getElementById('btn-pause').textContent = st.paused ? 'Resume' : 'Pause';
+}
+function stopSession() { resetState(); goSetup(); }
+function showSummary() {
+  show('screen-summary');
+  document.getElementById('sum-name').textContent = (document.getElementById('exName').value || 'Exercise') + ' complete';
+  document.getElementById('sum-reps').textContent = vals.reps * vals.sets;
+  document.getElementById('sum-sets').textContent = vals.sets;
+  document.getElementById('sum-time').textContent = st.totalHold + 's';
+}
+function again() { startSession(); }
+function goSetup() { resetState(); show('screen-setup'); }
+
+function toggleTheme() {
+  var root = document.documentElement;
+  var cur = root.getAttribute('data-theme');
+  var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  var isDark = cur === 'dark' || (!cur && sysDark);
+  root.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.getElementById('theme-btn').innerHTML = isDark ? '&#9790;' : '&#9788;';
+}
+(function() {
+  var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  document.getElementById('theme-btn').innerHTML = sysDark ? '&#9788;' : '&#9790;';
+})();
+</script>
+</body>
+</html>
