@@ -116,6 +116,16 @@ input[type="text"] { height: 15vw; min-height: 48px; padding: 0 4vw; border-radi
   cursor: pointer; font-family: 'DM Sans', sans-serif;
   white-space: nowrap;
 }
+.preset-list { display: flex; flex-wrap: wrap; gap: 2.5vw; align-items: center; min-height: 11vw; }
+.preset-chip { display: flex; align-items: stretch; border: 1.5px solid var(--bdr); border-radius: 99px; overflow: hidden; }
+.preset-load { background: var(--bg2); border: none; cursor: pointer; padding: 2vw 4vw; display: flex; flex-direction: column; align-items: flex-start; font-family: 'DM Sans', sans-serif; color: var(--txt); gap: 0.5vw; }
+.preset-load:active { background: var(--bg3); }
+.preset-name { font-size: 3.8vw; font-weight: 500; white-space: nowrap; }
+.preset-detail { font-size: 3.2vw; color: var(--txt2); white-space: nowrap; }
+.preset-del { background: var(--bg2); border: none; border-left: 1.5px solid var(--bdr); cursor: pointer; padding: 2vw 3.5vw; font-size: 4.5vw; color: var(--txt2); font-family: 'DM Sans', sans-serif; line-height: 1; }
+.preset-del:active { background: var(--bg3); color: var(--txt); }
+.preset-add { background: none; border: 1.5px dashed var(--bdr); border-radius: 99px; padding: 2vw 4vw; font-size: 3.8vw; color: var(--txt2); cursor: pointer; font-family: 'DM Sans', sans-serif; line-height: 1; }
+.preset-add:active { background: var(--bg2); }
 </style>
 </head>
 <body>
@@ -133,7 +143,7 @@ input[type="text"] { height: 15vw; min-height: 48px; padding: 0 4vw; border-radi
     <h2>Exercise setup</h2>
     <div>
       <div class="field-label">Exercise name</div>
-      <input type="text" id="exName" placeholder="e.g. Quad stretch">
+      <input type="text" id="exName" placeholder="e.g. Quad stretch" oninput="saveSettings()">
     </div>
     <div class="row2">
       <div>
@@ -158,6 +168,10 @@ input[type="text"] { height: 15vw; min-height: 48px; padding: 0 4vw; border-radi
     <div>
       <div class="field-label">Countdown before start (sec)</div>
       <div class="stepper"><button onclick="adj('countdown',-1)">-</button><span id="countdown-val">5</span><button onclick="adj('countdown',1)">+</button></div>
+    </div>
+    <div id="presets-section">
+      <div class="field-label">Presets</div>
+      <div class="preset-list" id="preset-list"></div>
     </div>
     <button class="big-btn btn-start" onclick="startSession()">Start</button>
   </div>
@@ -245,6 +259,96 @@ const maxs = { holdTime:300, reps:20, restTime:120, sets:5, countdown:30 };
 function adj(k, d) {
   vals[k] = Math.min(maxs[k], Math.max(mins[k], vals[k] + d));
   document.getElementById(k + '-val').textContent = vals[k];
+  saveSettings();
+}
+
+// ── Persistence ───────────────────────────────────────────────────────────────
+var LS_LAST = 'physio-last';
+var LS_PRESETS = 'physio-presets';
+
+function saveSettings() {
+  localStorage.setItem(LS_LAST, JSON.stringify({
+    vals: vals,
+    name: document.getElementById('exName').value
+  }));
+}
+
+function loadSettings() {
+  try {
+    var s = JSON.parse(localStorage.getItem(LS_LAST));
+    if (!s) return;
+    if (s.vals) Object.keys(vals).forEach(function(k) {
+      if (s.vals[k] != null) {
+        vals[k] = Math.min(maxs[k], Math.max(mins[k], s.vals[k]));
+        document.getElementById(k + '-val').textContent = vals[k];
+      }
+    });
+    if (s.name) document.getElementById('exName').value = s.name;
+  } catch(e) {}
+}
+
+// ── Presets ───────────────────────────────────────────────────────────────────
+function getPresets() {
+  try { return JSON.parse(localStorage.getItem(LS_PRESETS)) || []; } catch(e) { return []; }
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderPresets() {
+  var list = document.getElementById('preset-list');
+  list.innerHTML = '';
+  var presets = getPresets();
+  presets.forEach(function(p, i) {
+    var detail = p.holdTime + 's \u00d7 ' + p.reps + (p.sets > 1 ? ' \u00d7 ' + p.sets + ' sets' : '');
+    var chip = document.createElement('div');
+    chip.className = 'preset-chip';
+    chip.innerHTML =
+      '<button class="preset-load" onclick="applyPreset(' + i + ')">' +
+        '<span class="preset-name">' + escHtml(p.name) + '</span>' +
+        '<span class="preset-detail">' + detail + '</span>' +
+      '</button>' +
+      '<button class="preset-del" onclick="deletePreset(' + i + ')" title="Delete">\u00d7</button>';
+    list.appendChild(chip);
+  });
+  if (presets.length < 3) {
+    var btn = document.createElement('button');
+    btn.className = 'preset-add';
+    btn.textContent = '+ Save preset';
+    btn.onclick = savePreset;
+    list.appendChild(btn);
+  }
+}
+
+function savePreset() {
+  var name = (prompt('Preset name:', document.getElementById('exName').value || '') || '').trim();
+  if (!name) return;
+  var presets = getPresets();
+  if (presets.length >= 3) return;
+  presets.push(Object.assign({ name: name }, vals));
+  localStorage.setItem(LS_PRESETS, JSON.stringify(presets));
+  renderPresets();
+}
+
+function applyPreset(i) {
+  var p = getPresets()[i];
+  if (!p) return;
+  Object.keys(vals).forEach(function(k) {
+    if (p[k] != null) {
+      vals[k] = p[k];
+      document.getElementById(k + '-val').textContent = vals[k];
+    }
+  });
+  document.getElementById('exName').value = p.name;
+  saveSettings();
+}
+
+function deletePreset(i) {
+  var presets = getPresets();
+  presets.splice(i, 1);
+  localStorage.setItem(LS_PRESETS, JSON.stringify(presets));
+  renderPresets();
 }
 function show(id) {
   document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
@@ -455,6 +559,8 @@ function toggleTheme() {
   var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   document.getElementById('theme-btn').innerHTML = sysDark ? '&#9788;' : '&#9790;';
 })();
+loadSettings();
+renderPresets();
 </script>
 </body>
 </html>
