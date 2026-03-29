@@ -414,6 +414,16 @@ function setGoBtn(visible) {
 }
 
 var st = {};
+var wakeLock = null;
+
+async function acquireWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e) {}
+}
+function releaseWakeLock() {
+  if (wakeLock) { wakeLock.release(); wakeLock = null; }
+}
+
 function resetState() {
   clearInterval(st.interval);
   st = { phase:'idle', rep:0, set:0, timeLeft:0, totalHold:0, paused:false, interval:null, waitingForGo:false };
@@ -421,6 +431,7 @@ function resetState() {
 
 function startSession() {
   resetState();
+  acquireWakeLock();
   document.getElementById('ex-title').textContent = document.getElementById('exName').value || 'Exercise';
   document.getElementById('rep-current').textContent = 1;
   document.getElementById('rep-total').textContent = vals.reps;
@@ -536,8 +547,9 @@ function togglePause() {
   st.paused = !st.paused;
   document.getElementById('btn-pause').textContent = st.paused ? 'Resume' : 'Pause';
 }
-function stopSession() { resetState(); goSetup(); }
+function stopSession() { releaseWakeLock(); resetState(); goSetup(); }
 function showSummary() {
+  releaseWakeLock();
   show('screen-summary');
   document.getElementById('sum-name').textContent = (document.getElementById('exName').value || 'Exercise') + ' complete';
   document.getElementById('sum-reps').textContent = vals.reps * vals.sets;
@@ -561,6 +573,9 @@ function toggleTheme() {
 })();
 loadSettings();
 renderPresets();
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'visible' && st.phase !== 'idle') acquireWakeLock();
+});
 </script>
 </body>
 </html>
