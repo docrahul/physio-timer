@@ -381,6 +381,7 @@ ringFill.style.strokeDasharray = CIRC;
 
 // ── Picture-in-Picture ────────────────────────────────────────────────────────
 var pipWin = null;
+var pipCanvas = null, pipVideo = null, pipCtx = null;
 
 async function openPip() {
   if (!('documentPictureInPicture' in window)) return;
@@ -429,33 +430,113 @@ async function openPip() {
   updatePipBtn();
 }
 
+// ── Video PIP fallback (Android Chrome) ───────────────────────────────────────
+function initVideoPip() {
+  if (pipCanvas) return;
+  pipCanvas = document.createElement('canvas');
+  pipCanvas.width = 300; pipCanvas.height = 300;
+  pipCtx = pipCanvas.getContext('2d');
+  pipVideo = document.createElement('video');
+  pipVideo.muted = true; pipVideo.playsInline = true;
+  pipVideo.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0.01;pointer-events:none;top:0;left:0;';
+  pipVideo.srcObject = pipCanvas.captureStream(2);
+  document.body.appendChild(pipVideo);
+  pipVideo.addEventListener('leavepictureinpicture', function() { updatePipBtn(); });
+}
+
+async function openVideoPip() {
+  initVideoPip();
+  drawPipCanvas();
+  try {
+    await pipVideo.play();
+    await pipVideo.requestPictureInPicture();
+    updatePipBtn();
+  } catch(e) {}
+}
+
+function drawPipCanvas() {
+  if (!pipCtx) return;
+  var ctx = pipCtx, w = pipCanvas.width, h = pipCanvas.height;
+  var dt = document.documentElement.getAttribute('data-theme');
+  var dark = dt === 'dark' || (!dt && window.matchMedia('(prefers-color-scheme:dark)').matches);
+  var bgCol  = dark ? '#141414' : '#ffffff';
+  var txtCol = dark ? '#f0f0f0' : '#1a1a1a';
+  var mutCol = dark ? '#888888' : '#6b6b6b';
+  var rngBg  = dark ? '#2a2a2a' : '#efefec';
+  var rngCol = ringFill.style.stroke || '#1D9E75';
+  var frac   = Math.max(0, Math.min(1, 1 - (parseFloat(ringFill.style.strokeDashoffset) || 0) / CIRC));
+
+  // Background
+  ctx.fillStyle = bgCol; ctx.fillRect(0, 0, w, h);
+
+  // Ring
+  var cx = w / 2, cy = h * 0.46, r = 88;
+  ctx.lineWidth = 10; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.strokeStyle = rngBg; ctx.stroke();
+  if (frac > 0) {
+    ctx.beginPath(); ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
+    ctx.strokeStyle = rngCol; ctx.stroke();
+  }
+
+  // Time (center of ring)
+  ctx.fillStyle = txtCol; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = 'bold 58px monospace';
+  ctx.fillText(document.getElementById('timer-display').textContent, cx, cy - 6);
+
+  // Sub text
+  ctx.fillStyle = mutCol; ctx.font = '14px sans-serif';
+  ctx.fillText(document.getElementById('timer-sub').textContent, cx, cy + 36);
+
+  // Phase badge (top)
+  ctx.fillStyle = mutCol; ctx.font = 'bold 15px sans-serif';
+  ctx.fillText(document.getElementById('phase-badge').textContent, cx, 22);
+
+  // Rep + set (bottom)
+  ctx.font = '14px monospace';
+  ctx.fillText('Rep\u00a0' + document.getElementById('rep-current').textContent + '\u00a0/\u00a0' + document.getElementById('rep-total').textContent, cx, h - 42);
+  ctx.font = '12px sans-serif';
+  ctx.fillStyle = mutCol;
+  var titleTxt = document.getElementById('ex-title').textContent;
+  var setTxt   = document.getElementById('set-label').textContent;
+  ctx.textAlign = 'left';  ctx.fillText(titleTxt, 12, h - 16);
+  ctx.textAlign = 'right'; ctx.fillText(setTxt,   w - 12, h - 16);
+}
+
 function closePip() {
   if (pipWin) { pipWin.close(); pipWin = null; }
+  if (document.pictureInPictureElement) { document.exitPictureInPicture().catch(function(){}); }
   updatePipBtn();
 }
 
 function togglePip() {
-  if (pipWin) { closePip(); } else { openPip(); }
+  var active = pipWin || document.pictureInPictureElement === pipVideo;
+  if (active) { closePip(); }
+  else if ('documentPictureInPicture' in window) { openPip(); }
+  else { openVideoPip(); }
 }
 
 function updatePipBtn() {
   var btn = document.getElementById('btn-pip');
-  if (btn) btn.textContent = pipWin ? '\u00d7 PIP' : '\u29c9 PIP';
+  var active = pipWin != null || document.pictureInPictureElement === pipVideo;
+  if (btn) btn.textContent = active ? '\u00d7 PIP' : '\u29c9 PIP';
 }
 
 function syncPip() {
-  if (!pipWin) return;
-  var d = pipWin.document;
-  var el = function(id){ return d.getElementById(id); };
-  var t = el('pip-title'); if (t) t.textContent = document.getElementById('ex-title').textContent;
-  var sl = el('pip-set'); if (sl) sl.textContent = document.getElementById('set-label').textContent;
-  var mb = document.getElementById('phase-badge'), pb = el('pip-badge');
-  if (pb) { pb.textContent = mb.textContent; pb.className = mb.className; }
-  var ti = el('pip-time'); if (ti) ti.textContent = document.getElementById('timer-display').textContent;
-  var su = el('pip-sub'); if (su) su.textContent = document.getElementById('timer-sub').textContent;
-  var rp = el('pip-rep'); if (rp) rp.textContent = 'Rep\u00a0' + document.getElementById('rep-current').textContent + '\u00a0/\u00a0' + document.getElementById('rep-total').textContent;
-  var pr = el('pip-ring');
-  if (pr) { pr.style.strokeDashoffset = ringFill.style.strokeDashoffset; pr.style.stroke = ringFill.style.stroke; }
+  if (pipWin) {
+    var d = pipWin.document;
+    var el = function(id){ return d.getElementById(id); };
+    var t = el('pip-title'); if (t) t.textContent = document.getElementById('ex-title').textContent;
+    var sl = el('pip-set'); if (sl) sl.textContent = document.getElementById('set-label').textContent;
+    var mb = document.getElementById('phase-badge'), pb = el('pip-badge');
+    if (pb) { pb.textContent = mb.textContent; pb.className = mb.className; }
+    var ti = el('pip-time'); if (ti) ti.textContent = document.getElementById('timer-display').textContent;
+    var su = el('pip-sub'); if (su) su.textContent = document.getElementById('timer-sub').textContent;
+    var rp = el('pip-rep'); if (rp) rp.textContent = 'Rep\u00a0' + document.getElementById('rep-current').textContent + '\u00a0/\u00a0' + document.getElementById('rep-total').textContent;
+    var pr = el('pip-ring');
+    if (pr) { pr.style.strokeDashoffset = ringFill.style.strokeDashoffset; pr.style.stroke = ringFill.style.stroke; }
+  }
+  if (pipCtx && document.pictureInPictureElement === pipVideo) { drawPipCanvas(); }
 }
 
 function setRing(frac, color) {
@@ -655,7 +736,9 @@ function toggleTheme() {
 })();
 loadSettings();
 renderPresets();
-if ('documentPictureInPicture' in window) document.getElementById('btn-pip').style.display = '';
+var _hasDocPip   = 'documentPictureInPicture' in window;
+var _hasVideoPip = !!document.pictureInPictureEnabled && 'captureStream' in HTMLCanvasElement.prototype;
+if (_hasDocPip || _hasVideoPip) document.getElementById('btn-pip').style.display = '';
 document.addEventListener('visibilitychange', function() {
   if (document.visibilityState === 'visible' && st.phase !== 'idle') acquireWakeLock();
 });
