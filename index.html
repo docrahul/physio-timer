@@ -208,6 +208,7 @@ input[type="text"] { height: 15vw; min-height: 48px; padding: 0 4vw; border-radi
     <div class="ctrl-row">
       <button class="big-btn btn-ghost" id="btn-pause" onclick="togglePause()">Pause</button>
       <button class="big-btn btn-ghost" onclick="stopSession()">Stop</button>
+      <button class="big-btn btn-ghost" id="btn-pip" onclick="togglePip()" style="display:none;">&#x29c9; PIP</button>
     </div>
   </div>
 
@@ -378,9 +379,89 @@ var CIRC = 2 * Math.PI * 100;
 var ringFill = document.getElementById('ring-fill');
 ringFill.style.strokeDasharray = CIRC;
 
+// ── Picture-in-Picture ────────────────────────────────────────────────────────
+var pipWin = null;
+
+async function openPip() {
+  if (!('documentPictureInPicture' in window)) return;
+  try {
+    pipWin = await window.documentPictureInPicture.requestWindow({ width: 260, height: 320 });
+  } catch(e) { pipWin = null; return; }
+
+  // Copy all stylesheets so CSS vars and phase badge colours work
+  [...document.styleSheets].forEach(function(ss) {
+    try {
+      var style = pipWin.document.createElement('style');
+      style.textContent = [...ss.cssRules].map(function(r){ return r.cssText; }).join('\n');
+      pipWin.document.head.appendChild(style);
+    } catch(e) {}
+  });
+
+  pipWin.document.body.style.cssText = 'margin:0;background:var(--bg);color:var(--txt);font-family:"DM Sans",sans-serif;';
+  pipWin.document.body.innerHTML =
+    '<div style="padding:14px;display:flex;flex-direction:column;gap:10px;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+        '<span id="pip-title" style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px;"></span>' +
+        '<span id="pip-set" style="font-size:11px;color:var(--txt2);font-family:\'DM Mono\',monospace;flex-shrink:0;"></span>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:center;">' +
+        '<span id="pip-badge" class="phase-badge"></span>' +
+      '</div>' +
+      '<div style="position:relative;width:180px;height:180px;margin:0 auto;">' +
+        '<svg width="180" height="180" viewBox="0 0 240 240">' +
+          '<circle fill="none" stroke="var(--bg2)" stroke-width="8" cx="120" cy="120" r="100"/>' +
+          '<circle id="pip-ring" fill="none" stroke-width="8" stroke-linecap="round" cx="120" cy="120" r="100"' +
+            ' style="transform:rotate(-90deg);transform-origin:50% 50%;transition:stroke-dashoffset 0.5s linear,stroke 0.3s;stroke-dasharray:628.3;stroke-dashoffset:0;"/>' +
+        '</svg>' +
+        '<div style="position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;">' +
+          '<div id="pip-time" style="font-size:52px;font-weight:500;font-family:\'DM Mono\',monospace;line-height:1;letter-spacing:-2px;color:var(--txt);"></div>' +
+          '<div id="pip-sub" style="font-size:11px;color:var(--txt2);margin-top:4px;"></div>' +
+        '</div>' +
+      '</div>' +
+      '<div id="pip-rep" style="text-align:center;font-size:12px;color:var(--txt2);"></div>' +
+    '</div>';
+
+  // Inherit dark/light theme
+  pipWin.document.documentElement.setAttribute('data-theme', document.documentElement.getAttribute('data-theme') || '');
+
+  pipWin.addEventListener('pagehide', function() { pipWin = null; updatePipBtn(); });
+  syncPip();
+  updatePipBtn();
+}
+
+function closePip() {
+  if (pipWin) { pipWin.close(); pipWin = null; }
+  updatePipBtn();
+}
+
+function togglePip() {
+  if (pipWin) { closePip(); } else { openPip(); }
+}
+
+function updatePipBtn() {
+  var btn = document.getElementById('btn-pip');
+  if (btn) btn.textContent = pipWin ? '\u00d7 PIP' : '\u29c9 PIP';
+}
+
+function syncPip() {
+  if (!pipWin) return;
+  var d = pipWin.document;
+  var el = function(id){ return d.getElementById(id); };
+  var t = el('pip-title'); if (t) t.textContent = document.getElementById('ex-title').textContent;
+  var sl = el('pip-set'); if (sl) sl.textContent = document.getElementById('set-label').textContent;
+  var mb = document.getElementById('phase-badge'), pb = el('pip-badge');
+  if (pb) { pb.textContent = mb.textContent; pb.className = mb.className; }
+  var ti = el('pip-time'); if (ti) ti.textContent = document.getElementById('timer-display').textContent;
+  var su = el('pip-sub'); if (su) su.textContent = document.getElementById('timer-sub').textContent;
+  var rp = el('pip-rep'); if (rp) rp.textContent = 'Rep\u00a0' + document.getElementById('rep-current').textContent + '\u00a0/\u00a0' + document.getElementById('rep-total').textContent;
+  var pr = el('pip-ring');
+  if (pr) { pr.style.strokeDashoffset = ringFill.style.strokeDashoffset; pr.style.stroke = ringFill.style.stroke; }
+}
+
 function setRing(frac, color) {
   ringFill.style.strokeDashoffset = CIRC * (1 - Math.max(0, Math.min(1, frac)));
   ringFill.style.stroke = color || '#1D9E75';
+  syncPip();
 }
 function fmtTime(s) {
   s = Math.max(0, s);
@@ -390,6 +471,7 @@ function fmtTime(s) {
 function badge(text, cls) {
   var b = document.getElementById('phase-badge');
   b.textContent = text; b.className = 'phase-badge ' + cls;
+  syncPip();
 }
 function buildDots() {
   var c = document.getElementById('rep-dots'); c.innerHTML = '';
@@ -547,9 +629,9 @@ function togglePause() {
   st.paused = !st.paused;
   document.getElementById('btn-pause').textContent = st.paused ? 'Resume' : 'Pause';
 }
-function stopSession() { releaseWakeLock(); resetState(); goSetup(); }
+function stopSession() { closePip(); releaseWakeLock(); resetState(); goSetup(); }
 function showSummary() {
-  releaseWakeLock();
+  closePip(); releaseWakeLock();
   show('screen-summary');
   document.getElementById('sum-name').textContent = (document.getElementById('exName').value || 'Exercise') + ' complete';
   document.getElementById('sum-reps').textContent = vals.reps * vals.sets;
@@ -573,6 +655,7 @@ function toggleTheme() {
 })();
 loadSettings();
 renderPresets();
+if ('documentPictureInPicture' in window) document.getElementById('btn-pip').style.display = '';
 document.addEventListener('visibilitychange', function() {
   if (document.visibilityState === 'visible' && st.phase !== 'idle') acquireWakeLock();
 });
