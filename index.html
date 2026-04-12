@@ -126,6 +126,21 @@ input[type="text"] { height: 15vw; min-height: 48px; padding: 0 4vw; border-radi
 .preset-del:active { background: var(--bg3); color: var(--txt); }
 .preset-add { background: none; border: 1.5px dashed var(--bdr); border-radius: 99px; padding: 2vw 4vw; font-size: 3.8vw; color: var(--txt2); cursor: pointer; font-family: 'DM Sans', sans-serif; line-height: 1; }
 .preset-add:active { background: var(--bg2); }
+.setup-header { display: flex; justify-content: space-between; align-items: center; }
+.icon-btn { background: none; border: none; font-size: 6vw; cursor: pointer; color: var(--txt2); padding: 1vw; line-height: 1; }
+.icon-btn:active { color: var(--txt); }
+.btn-auto-on { border-color: var(--c-accent) !important; color: var(--c-accent) !important; }
+#screen-settings { position: fixed; inset: 0; background: var(--bg); z-index: 150; overflow-y: auto; display: none; }
+.settings-inner { padding: 7vw 5vw 12vw; display: flex; flex-direction: column; gap: 6vw; max-width: 600px; margin: 0 auto; font-family: 'DM Sans', sans-serif; color: var(--txt); }
+.settings-hdr { display: flex; justify-content: space-between; align-items: center; }
+.settings-hdr h2 { font-size: 7vw; font-weight: 500; }
+.swatch-row { display: flex; gap: 4vw; flex-wrap: wrap; }
+.swatch { width: 12vw; height: 12vw; min-width: 44px; min-height: 44px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; transition: border-color 0.2s; box-sizing: border-box; }
+.swatch.selected { border-color: var(--txt); }
+.option-row { display: flex; gap: 2.5vw; flex-wrap: wrap; }
+.opt-btn { padding: 2.5vw 4vw; border-radius: 99px; border: 1.5px solid var(--bdr); background: var(--bg2); color: var(--txt); font-size: 3.8vw; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+.opt-btn.selected { background: var(--c-accent); color: #fff; border-color: var(--c-accent); }
+.opt-btn:active { opacity: 0.75; }
 </style>
 </head>
 <body>
@@ -140,7 +155,10 @@ input[type="text"] { height: 15vw; min-height: 48px; padding: 0 4vw; border-radi
 <div id="app">
 
   <div class="screen active" id="screen-setup">
-    <h2>Exercise setup</h2>
+    <div class="setup-header">
+      <h2>Exercise setup</h2>
+      <button class="icon-btn" onclick="openSettings()" title="Customise">&#9881;</button>
+    </div>
     <div>
       <div class="field-label">Exercise name</div>
       <input type="text" id="exName" placeholder="e.g. Quad stretch" oninput="saveSettings()">
@@ -208,6 +226,7 @@ input[type="text"] { height: 15vw; min-height: 48px; padding: 0 4vw; border-radi
     <div class="ctrl-row">
       <button class="big-btn btn-ghost" id="btn-pause" onclick="togglePause()">Pause</button>
       <button class="big-btn btn-ghost" onclick="stopSession()">Stop</button>
+      <button class="big-btn btn-ghost" id="btn-auto" onclick="toggleAutorun()">Auto: Off</button>
     </div>
   </div>
 
@@ -225,6 +244,34 @@ input[type="text"] { height: 15vw; min-height: 48px; padding: 0 4vw; border-radi
     <button class="big-btn btn-ghost" onclick="goSetup()">Edit setup</button>
   </div>
 
+</div>
+
+<div id="screen-settings">
+  <div class="settings-inner">
+    <div class="settings-hdr">
+      <h2>Customise</h2>
+      <button class="icon-btn" onclick="closeSettings()">&#x2715;</button>
+    </div>
+    <div>
+      <div class="field-label">Accent colour</div>
+      <div class="swatch-row" id="swatch-row"></div>
+    </div>
+    <div>
+      <div class="field-label">Sounds</div>
+      <div class="option-row" id="sound-row">
+        <button class="opt-btn" onclick="setSound('classic')">Classic</button>
+        <button class="opt-btn" onclick="setSound('soft')">Soft</button>
+        <button class="opt-btn" onclick="setSound('crisp')">Crisp</button>
+        <button class="opt-btn" onclick="setSound('silent')">Silent</button>
+      </div>
+    </div>
+    <div>
+      <div class="field-label">Appearance</div>
+      <div class="option-row">
+        <button class="opt-btn" id="overlay-theme-btn" onclick="toggleTheme()">Dark mode</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -355,14 +402,99 @@ function show(id) {
   document.getElementById(id).classList.add('active');
 }
 
+// ── Themes & sounds ───────────────────────────────────────────────────────────
+const THEMES = {
+  forest: { accent:'#1D9E75', al:'#E1F5EE', ad:'#085041' },
+  ocean:  { accent:'#2B7CB8', al:'#E0EEF8', ad:'#0C3D6B' },
+  coral:  { accent:'#E05A4A', al:'#FAE8E6', ad:'#6B1A12' },
+  violet: { accent:'#7C5CBF', al:'#EDE8F8', ad:'#3B1F7A' },
+  ember:  { accent:'#D97706', al:'#FEF3C7', ad:'#78350F' },
+};
+var currentTheme = 'forest';
+var accentHex = '#1D9E75';
+
+const SOUND_STYLES = {
+  classic: { type:'sine',   vol:1.0 },
+  soft:    { type:'sine',   vol:0.4 },
+  crisp:   { type:'square', vol:0.5 },
+  silent:  { type:null,     vol:0   },
+};
+var soundStyle = 'classic';
+var autorun = false;
+
+var LS_CUSTOM = 'physio-custom';
+
+function saveCustom() {
+  localStorage.setItem(LS_CUSTOM, JSON.stringify({ theme: currentTheme, sound: soundStyle, autorun: autorun }));
+}
+
+function loadCustom() {
+  try {
+    var c = JSON.parse(localStorage.getItem(LS_CUSTOM)) || {};
+    applyTheme(c.theme || 'forest');
+    soundStyle = SOUND_STYLES[c.sound] ? c.sound : 'classic';
+    autorun = !!c.autorun;
+  } catch(e) { applyTheme('forest'); }
+}
+
+function applyTheme(name) {
+  var t = THEMES[name] || THEMES.forest;
+  currentTheme = name;
+  var r = document.documentElement.style;
+  r.setProperty('--c-accent', t.accent);
+  r.setProperty('--c-al',     t.al);
+  r.setProperty('--c-ad',     t.ad);
+  accentHex = t.accent;
+  renderThemeSwatches();
+}
+
+function renderThemeSwatches() {
+  var row = document.getElementById('swatch-row'); if (!row) return;
+  row.innerHTML = '';
+  Object.keys(THEMES).forEach(function(name) {
+    var btn = document.createElement('button');
+    btn.className = 'swatch' + (name === currentTheme ? ' selected' : '');
+    btn.style.background = THEMES[name].accent;
+    btn.title = name;
+    btn.onclick = function() { applyTheme(name); saveCustom(); };
+    row.appendChild(btn);
+  });
+}
+
+function setSound(name) {
+  soundStyle = name; saveCustom(); renderSoundOptions();
+}
+
+function renderSoundOptions() {
+  document.querySelectorAll('#sound-row .opt-btn').forEach(function(btn) {
+    var s = btn.getAttribute('onclick').replace("setSound('","").replace("')","");
+    btn.classList.toggle('selected', s === soundStyle);
+  });
+}
+
+function openSettings()  { document.getElementById('screen-settings').style.display = ''; }
+function closeSettings() { document.getElementById('screen-settings').style.display = 'none'; }
+
+function toggleAutorun() {
+  autorun = !autorun;
+  var btn = document.getElementById('btn-auto');
+  btn.textContent = autorun ? 'Auto: On' : 'Auto: Off';
+  btn.classList.toggle('btn-auto-on', autorun);
+  saveCustom();
+}
+
 let audioCtx = null;
 function beep(freq, dur, vol) {
+  var s = SOUND_STYLES[soundStyle]; if (!s || s.type === null) return;
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
     var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = s.type;
     o.connect(g); g.connect(audioCtx.destination);
     o.frequency.value = freq;
-    g.gain.setValueAtTime(vol || 0.4, audioCtx.currentTime);
+    var v = (vol || 0.4) * s.vol;
+    g.gain.setValueAtTime(v, audioCtx.currentTime);
     g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
     o.start(); o.stop(audioCtx.currentTime + dur);
   } catch(e) {}
@@ -401,11 +533,12 @@ function buildDots() {
     d.className = 'dot'; d.id = 'dot-' + i; c.appendChild(d);
   }
 }
-function updateDots(done) {
+function updateDots(completedCount, activeIdx) {
   var n = Math.min(vals.reps, 20);
   for (var i = 0; i < n; i++) {
     var d = document.getElementById('dot-' + i); if (!d) continue;
-    d.className = 'dot' + (i < done ? ' done' : (i === done ? ' active' : ''));
+    d.className = 'dot' + (i < completedCount ? ' done' :
+                  (activeIdx !== undefined && i === activeIdx ? ' active' : ''));
   }
 }
 function setGoBtn(visible) {
@@ -437,7 +570,7 @@ function startSession() {
   document.getElementById('rep-total').textContent = vals.reps;
   document.getElementById('set-label').textContent = 'Set 1 / ' + vals.sets;
   document.getElementById('btn-pause').textContent = 'Pause';
-  buildDots(); updateDots(0); setGoBtn(false);
+  buildDots(); updateDots(0, 0); setGoBtn(false);
   show('screen-timer');
   vals.countdown > 0 ? startCountdown() : showReadyPrompt();
 }
@@ -463,13 +596,14 @@ function showReadyPrompt() {
   clearInterval(st.interval);
   st.phase = 'ready'; st.waitingForGo = true;
   badge('Ready', 'ph-ready');
-  setRing(0, '#1D9E75');
+  setRing(0, accentHex);
   document.getElementById('timer-display').textContent = '-';
   document.getElementById('timer-sub').textContent = 'rep ' + (st.rep + 1);
   document.getElementById('rep-current').textContent = st.rep + 1;
-  updateDots(st.rep);
+  updateDots(st.rep, st.rep);
   setGoBtn(true);
   beepReady();
+  if (autorun) setTimeout(manualGo, 1000);
 }
 
 function manualGo() {
@@ -481,7 +615,7 @@ function manualGo() {
 function startHold() {
   st.phase = 'hold'; st.timeLeft = vals.holdTime;
   badge('Hold', 'ph-hold');
-  setRing(1, '#1D9E75');
+  setRing(1, accentHex);
   document.getElementById('timer-display').textContent = fmtTime(st.timeLeft);
   document.getElementById('timer-sub').textContent = 'remaining';
   beepGo();
@@ -489,7 +623,7 @@ function startHold() {
   st.interval = setInterval(function() {
     if (st.paused) return;
     st.timeLeft--;
-    setRing(st.timeLeft / vals.holdTime, '#1D9E75');
+    setRing(st.timeLeft / vals.holdTime, accentHex);
     document.getElementById('timer-display').textContent = fmtTime(st.timeLeft);
     if (st.timeLeft <= 3 && st.timeLeft > 0) beepTick();
     if (st.timeLeft <= 0) { clearInterval(st.interval); repDone(); }
@@ -524,7 +658,7 @@ function endSet() {
   clearInterval(st.interval); st.set++;
   if (st.set >= vals.sets) { showSummary(); return; }
   document.getElementById('set-label').textContent = 'Set ' + (st.set + 1) + ' / ' + vals.sets;
-  st.rep = 0; buildDots(); updateDots(0);
+  st.rep = 0; buildDots(); updateDots(0, 0);
   if (vals.restTime > 0) {
     st.phase = 'rest'; st.timeLeft = vals.restTime;
     badge('Set rest', 'ph-rest');
@@ -566,13 +700,25 @@ function toggleTheme() {
   var isDark = cur === 'dark' || (!cur && sysDark);
   root.setAttribute('data-theme', isDark ? 'light' : 'dark');
   document.getElementById('theme-btn').innerHTML = isDark ? '&#9790;' : '&#9788;';
+  var ob = document.getElementById('overlay-theme-btn');
+  if (ob) ob.textContent = isDark ? 'Light mode' : 'Dark mode';
 }
 (function() {
   var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  document.getElementById('theme-btn').innerHTML = sysDark ? '&#9788;' : '&#9790;';
+  var isDark = sysDark;
+  document.getElementById('theme-btn').innerHTML = isDark ? '&#9788;' : '&#9790;';
+  var ob = document.getElementById('overlay-theme-btn');
+  if (ob) ob.textContent = isDark ? 'Light mode' : 'Dark mode';
 })();
 loadSettings();
 renderPresets();
+loadCustom();
+renderThemeSwatches();
+renderSoundOptions();
+(function() {
+  var btn = document.getElementById('btn-auto');
+  if (btn) { btn.textContent = autorun ? 'Auto: On' : 'Auto: Off'; btn.classList.toggle('btn-auto-on', autorun); }
+})();
 document.addEventListener('visibilitychange', function() {
   if (document.visibilityState === 'visible' && st.phase !== 'idle') acquireWakeLock();
 });
