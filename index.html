@@ -276,10 +276,9 @@ input[type="text"] { height: 15vw; min-height: 48px; padding: 0 4vw; border-radi
       </div>
       <div class="rep-dots" id="rep-dots"></div>
     </div>
-    <button class="big-btn btn-go" id="btn-go" onclick="manualGo()" style="display:none;">Hold</button>
+    <button class="big-btn btn-go" id="btn-go" onclick="manualGo()">Hold</button>
     <div class="hint" id="hint-text" style="display:none;">Press when you are in position</div>
     <div class="ctrl-row">
-      <button class="big-btn btn-ghost" id="btn-pause" onclick="togglePause()">Pause</button>
       <button class="big-btn btn-ghost" onclick="stopSession()">Stop</button>
       <button class="big-btn btn-ghost" id="btn-auto" onclick="toggleAutorun()">Auto: Off</button>
     </div>
@@ -596,9 +595,18 @@ function updateDots(completedCount, activeIdx) {
                   (activeIdx !== undefined && i === activeIdx ? ' active' : ''));
   }
 }
-function setGoBtn(visible) {
-  document.getElementById('btn-go').style.display = visible ? 'block' : 'none';
-  document.getElementById('hint-text').style.display = visible ? 'block' : 'none';
+function setGoBtn(isReady) {
+  var btn  = document.getElementById('btn-go');
+  var hint = document.getElementById('hint-text');
+  if (isReady) {
+    btn.textContent = 'Hold';
+    btn.onclick = manualGo;
+    hint.style.display = 'block';
+  } else {
+    btn.textContent = 'Pause';
+    btn.onclick = togglePause;
+    hint.style.display = 'none';
+  }
 }
 
 var st = {};
@@ -624,7 +632,6 @@ function startSession() {
   document.getElementById('rep-current').textContent = 1;
   document.getElementById('rep-total').textContent = vals.reps;
   document.getElementById('set-label').textContent = 'Set 1 / ' + vals.sets;
-  document.getElementById('btn-pause').textContent = 'Pause';
   buildDots(); updateDots(0, 0); setGoBtn(false);
   show('screen-timer');
   vals.countdown > 0 ? startCountdown() : showReadyPrompt();
@@ -734,7 +741,7 @@ function endSet() {
 function togglePause() {
   if (st.waitingForGo) return;
   st.paused = !st.paused;
-  document.getElementById('btn-pause').textContent = st.paused ? 'Resume' : 'Pause';
+  document.getElementById('btn-go').textContent = st.paused ? 'Resume' : 'Pause';
 }
 function stopSession() { releaseWakeLock(); resetState(); goSetup(); }
 function showSummary() {
