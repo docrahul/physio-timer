@@ -479,7 +479,7 @@ var autorun = false;
 var LS_CUSTOM = 'physio-custom';
 
 function saveCustom() {
-  localStorage.setItem(LS_CUSTOM, JSON.stringify({ theme: currentTheme, sound: soundStyle, autorun: autorun }));
+  localStorage.setItem(LS_CUSTOM, JSON.stringify({ theme: currentTheme, sound: soundStyle }));
 }
 
 function loadCustom() {
@@ -487,7 +487,7 @@ function loadCustom() {
     var c = JSON.parse(localStorage.getItem(LS_CUSTOM)) || {};
     applyTheme(c.theme || 'forest');
     soundStyle = SOUND_STYLES[c.sound] ? c.sound : 'classic';
-    autorun = !!c.autorun;
+    autorun = false;
   } catch(e) { applyTheme('forest'); }
 }
 
